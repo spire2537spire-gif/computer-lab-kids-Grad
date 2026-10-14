@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบงานตัดเกรดและประมวลผลคะแนนนักเรียน</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Sarabun & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', 'Inter', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        
+        /* Modern Spreadsheet Table */
+        .modern-sheet {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .modern-sheet th, .modern-sheet td {
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .modern-sheet tr th:first-child,
+        .modern-sheet tr td:first-child {
+            border-left: 1px solid #cbd5e1;
+        }
+        .modern-sheet thead tr:first-child th {
+            border-top: 1px solid #cbd5e1;
+        }
+
+        /* Vertical text for indicator headers */
+        .vertical-header {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            white-space: nowrap;
+            max-height: 125px;
+            padding: 8px 2px;
+            font-size: 0.76rem;
+            line-height: 1.15;
+            text-align: left;
+            letter-spacing: 0.01em;
+        }
+
+        /* Sticky first column for smooth horizontal scrolling */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+        }
+
+        /* Remove number input spinners for clean spreadsheet look */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Print styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: #ffffff !important;
+            }
+            .print-container {
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+            }
+            .sticky-col {
+                position: static !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Top Modern Glass Navigation Bar -->
+    <header class="bg-slate-900/95 backdrop-blur-md text-white shadow-lg no-print sticky top-0 z-40 border-b border-slate-800">
+        <div class="max-w-[1640px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+            <!-- Brand Identity -->
+            <div class="flex items-center gap-3.5">
+                <div class="bg-gradient-to-br from-indigo-500 via-blue-600 to-emerald-500 text-white w-11 h-11 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
+                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">SmartGrade ปพ.5</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded-full">
+                            Kruspire cpm
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-medium mt-0.5" id="headerSchoolSubtitle">โรงเรียนบ้านหนองแสงวิทยา สพป.ชัยภูมิ เขต 2</p>
+                </div>
+            </div>
+
+            <!-- Navigation Pills -->
+            <div class="flex flex-wrap items-center gap-1.5 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700/70">
+                <button onclick="navigateTo('home')" id="navBtn-home" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-grid-2"></i> แดชบอร์ดตั้งค่า
+                </button>
+                <button onclick="navigateTo('students')" id="navBtn-students" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-user-graduate"></i> รายชื่อนักเรียน
+                </button>
+                <button onclick="navigateTo('gradebook', currentSubjectIndex)" id="navBtn-gradebook" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-table-list"></i> ตารางตัดเกรดรายวิชา
+                </button>
+                <button onclick="navigateTo('summary')" id="navBtn-summary" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-chart-Simple"></i> สรุปเกรดทุกวิชา (GPA)
+                </button>
+            </div>
+
+            <!-- Utility Actions -->
+            <div class="flex items-center gap-2">
+                <button onclick="exportCurrentCSV()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all flex items-center gap-2 shadow-sm shadow-emerald-900/30 active:scale-95" title="ส่งออกไฟล์ CSV สำหรับเปิดใน Excel">
+                    <i class="fa-solid fa-file-csv text-sm"></i> <span class="hidden sm:inline">ส่งออก Excel</span>
+                </button>
+                <button onclick="window.print()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-2 active:scale-95" title="พิมพ์เอกสารหน้านี้">
+                    <i class="fa-solid fa-print"></i> <span class="hidden sm:inline">พิมพ์</span>
+                </button>
+                <button onclick="openResetModal()" class="p-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all active:scale-95" title="คืนค่าข้อมูลเริ่มต้น">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-[1640px] w-full mx-auto p-4 sm:p-6 flex-1 print-container">
+
+        <!-- ==========================================
+             VIEW 1: หน้าหลัก / แดชบอร์ดตั้งค่าโปรแกรม
+             ========================================== -->
+        <section id="view-home" class="space-y-6">
+            
+            <!-- Top KPI Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between hover:shadow-md transition">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">จำนวนนักเรียนทั้งหมด</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 class="text-3xl font-extrabold text-slate-800" id="statStudentCount">12</h3>
+                            <span class="text-xs font-medium text-slate-500">คน</span>
+                        </div>
+                        <button onclick="navigateTo('students')" class="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                            จัดการรายชื่อ <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                        </button>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between hover:shadow-md transition">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">รายวิชาในระบบ</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 class="text-3xl font-extrabold text-slate-800" id="statSubjectCount">15</h3>
+                            <span class="text-xs font-medium text-slate-500">รายวิชา</span>
+                        </div>
+                        <span class="mt-2 inline-block text-xs text-emerald-600 font-medium">
+                            <i class="fa-solid fa-circle-check"></i> พร้อมประมวลผลเกรด
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between hover:shadow-md transition">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">ระดับชั้นเรียนปัจจุบัน</p>
+                        <h3 class="text-lg font-bold text-slate-800 mt-1.5 truncate max-w-[200px]" id="kpiGradeLevel">ประถมศึกษาปีที่ 1</h3>
+                        <p class="text-xs text-slate-500 mt-1 truncate max-w-[200px]" id="kpiTeacherName">ครูรพีพร ศักดิ์อุดมกุล</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-school"></i>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 p-5 rounded-2xl shadow-md text-white flex flex-col justify-between">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="px-2 py-0.5 text-[10px] font-bold bg-white/20 rounded-md uppercase">Quick Access</span>
+                            <h3 class="font-bold text-base mt-1.5">ตัวอย่างข้อมูลคะแนนจริง</h3>
+                        </div>
+                        <i class="fa-solid fa-bolt text-amber-300 text-xl"></i>
+                    </div>
+                    <button onclick="navigateTo('gradebook', 11)" class="mt-3 w-full py-2 px-3 bg-white text-indigo-700 hover:bg-indigo-50 font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                        <span>เปิดวิชา "วิทยาศาสตร์ 12"</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main 12-Col Dashboard Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <!-- Left Column: ตั้งค่าโปรแกรม + ทางลัด 15 วิชา (4 cols) -->
+                <div class="lg:col-span-4 flex flex-col gap-6">
+                    
+                    <!-- School Settings Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-sliders text-indigo-400"></i>
+                                <h2 class="font-bold text-base">ตั้งค่าข้อมูลพื้นฐานโรงเรียน</h2>
+                            </div>
+                            <span class="text-[11px] text-slate-400">บันทึกอัตโนมัติ</span>
+                        </div>
+
+                        <div class="p-5 space-y-3.5 text-sm" id="schoolSettingsTable">
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">โรงเรียน</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-school" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-semibold text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">เขตพื้นที่</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-districtArea" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">ตำบล / แขวง</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-subdistrict" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">อำเภอ / เขต</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-district" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">จังหวัด</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-province" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">ระดับชั้น</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-gradeLevel" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-semibold text-indigo-700 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">ครูประจำชั้น</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-teacher" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-12 items-center gap-2">
+                                <label class="col-span-4 font-semibold text-slate-600 text-xs sm:text-sm">ผู้อำนวยการ</label>
+                                <div class="col-span-8">
+                                    <input type="text" id="cfg-director" oninput="updateSchoolConfig()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none font-medium text-slate-800 transition">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subject Navigation Grid Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-compass text-indigo-600"></i> เมนูลัดเข้าสู่รายวิชา
+                            </h3>
+                            <span class="text-xs text-slate-400">คลิกเลือกวิชาเพื่อกรอกคะแนน</span>
+                        </div>
+
+                        <button onclick="navigateTo('students')" class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-base rounded-xl shadow-sm shadow-indigo-500/20 transition flex items-center justify-center gap-2.5 active:scale-[0.99]">
+                            <i class="fa-solid fa-address-book"></i>
+                            <span>จัดการข้อมูลรายชื่อนักเรียน</span>
+                        </button>
+                        
+                        <div id="subjectButtonsGrid" class="grid grid-cols-2 gap-2.5">
+                            <!-- Populated dynamically via JS for วิชาที่ 1 - 15 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Column: กำหนดรายวิชา (5 cols) -->
+                <div class="lg:col-span-5 flex flex-col gap-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-list-check text-emerald-400"></i>
+                                <h2 class="font-bold text-base">กำหนดรายวิชา (15 รายวิชา)</h2>
+                            </div>
+                            <span class="text-xs text-slate-300 bg-white/10 px-2.5 py-0.5 rounded-full">แก้ไขรหัสและชื่อวิชาได้</span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/80 text-slate-600 border-b border-slate-200 text-xs uppercase tracking-wider">
+                                        <th class="font-bold py-2.5 px-3 w-14 text-center">ลำดับ</th>
+                                        <th class="font-bold py-2.5 px-3 w-32 text-center">รหัสวิชา</th>
+                                        <th class="font-bold py-2.5 px-4 text-left">ชื่อรายวิชา</th>
+                                        <th class="font-bold py-2.5 px-3 w-20 text-center">ตัดเกรด</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="subjectsSetupBody" class="divide-y divide-slate-200/70">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Developer Profile (Kruspire cpm) + คำแนะนำในการใช้งาน (3 cols) -->
+                <div class="lg:col-span-3 flex flex-col gap-6">
+                    
+                    <!-- Modern Developer Card: Kruspire cpm -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="h-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-500 relative">
+                            <div class="absolute -bottom-7 left-5 w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-2xl font-extrabold shadow-lg ring-4 ring-white">
+                                <i class="fa-solid fa-code text-emerald-400"></i>
+                            </div>
+                            <span class="absolute top-3 right-3 px-2.5 py-1 bg-black/30 backdrop-blur-md text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+                                Official Developer
+                            </span>
+                        </div>
+                        <div class="pt-9 px-5 pb-5">
+                            <div class="flex items-center gap-1.5">
+                                <h3 class="font-extrabold text-lg text-slate-900 tracking-tight">Kruspire cpm</h3>
+                                <i class="fa-solid fa-circle-check text-blue-500 text-sm" title="Verified Developer"></i>
+                            </div>
+                            <p class="text-xs text-slate-500 font-medium mt-0.5">ผู้พัฒนาและออกแบบระบบวัดผลการศึกษาดิจิทัล</p>
+
+                            <div class="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-xs">
+                                <div class="flex items-center justify-between text-slate-600">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-layer-group text-indigo-500 w-4"></i> สถาปัตยกรรม</span>
+                                    <span class="font-bold text-slate-800">Kruspire cpm Studio</span>
+                                </div>
+                                <div class="flex items-center justify-between text-slate-600">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-code-branch text-emerald-500 w-4"></i> เวอร์ชันระบบ</span>
+                                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md">v2.5 Modern UI</span>
+                                </div>
+                                <div class="flex items-center justify-between text-slate-600">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-shield-halved text-blue-500 w-4"></i> สถานะข้อมูล</span>
+                                    <span class="font-semibold text-slate-800">Auto-Save Ready</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-200/70 text-[11px] text-slate-600 flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-sparkles"></i>
+                                </div>
+                                <div>
+                                    พัฒนาโดย <b class="text-slate-900">Kruspire cpm</b> เพื่อยกระดับงานทะเบียนและวัดผลครูไทยให้รวดเร็วและแม่นยำ
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instructions & Guide Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="bg-amber-500/10 border-b border-amber-500/20 px-5 py-3.5 flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-lightbulb"></i>
+                            </div>
+                            <h3 class="font-bold text-slate-800 text-sm">คำแนะนำในการใช้งาน</h3>
+                        </div>
+                        <div class="p-5 space-y-3 text-xs sm:text-sm text-slate-600">
+                            <div class="flex items-start gap-2.5">
+                                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                                <p>ตรวจสอบและตั้งค่าข้อมูลโรงเรียน ระดับชั้น และรายวิชาทั้ง 15 วิชาในหน้าแดชบอร์ด</p>
+                            </div>
+                            <div class="flex items-start gap-2.5">
+                                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                                <p>กรอกเฉพาะใน <b>ช่องป้อนข้อมูลสีขาว</b> ระบบจะคำนวณรวมคะแนนและตัดเกรดให้อัตโนมัติทันที</p>
+                            </div>
+                            <div class="flex items-start gap-2.5">
+                                <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                                <p>รองรับการกดปุ่ม <b>Enter</b> หรือ <b>ลูกศรบนคีย์บอร์ด</b> เพื่อเลื่อนช่องกรอกคะแนนอย่างรวดเร็ว</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 2: กำหนดข้อมูลรายชื่อนักเรียน
+             ========================================== -->
+        <section id="view-students" class="hidden space-y-5">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-user-graduate"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900">กำหนดข้อมูลรายชื่อนักเรียน</h2>
+                            <p class="text-xs text-slate-500">รายชื่อจะเชื่อมโยงกับตารางตัดเกรดทั้ง 15 รายวิชาโดยอัตโนมัติ</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5 no-print">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="studentSearchInput" oninput="renderStudentsView()" placeholder="ค้นหาชื่อนักเรียน..." class="pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                        </div>
+                        <button onclick="addStudentRow()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm flex items-center gap-2 transition active:scale-95">
+                            <i class="fa-solid fa-user-plus"></i> เพิ่มนักเรียน
+                        </button>
+                        <button onclick="navigateTo('home')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-left"></i> หน้าหลัก
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-5 overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900 text-white text-xs uppercase tracking-wider">
+                                <th class="py-3 px-4 w-20 text-center rounded-tl-xl">ลำดับที่</th>
+                                <th class="py-3 px-4 text-left">ชื่อ - นามสกุล</th>
+                                <th class="py-3 px-4 w-36 text-center">เลขที่ประจำตัว</th>
+                                <th class="py-3 px-4 w-24 text-center rounded-tr-xl no-print">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentRosterBody" class="divide-y divide-slate-200 border-x border-b border-slate-200">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 3: ตารางคะแนนและตัดเกรดรายวิชา
+             ========================================== -->
+        <section id="view-gradebook" class="hidden space-y-5">
+            
+            <!-- Modern Top Control & Subject Summary Card -->
+            <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl">
+                            <i class="fa-solid fa-book text-indigo-600 text-sm"></i>
+                            <label class="text-xs font-bold text-indigo-950">เลือกรายวิชา:</label>
+                            <select id="gradebookSubjectSelect" onchange="navigateTo('gradebook', parseInt(this.value))" class="bg-transparent text-sm font-extrabold text-indigo-700 focus:outline-none cursor-pointer pr-2">
+                                <!-- Populated via JS -->
+                            </select>
+                        </div>
+
+                        <!-- Score Ratio Pill -->
+                        <div class="flex items-center gap-2 bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200">
+                            <span class="text-xs font-bold text-slate-600">อัตราส่วนคะแนน (เก็บ : ปลายภาค)</span>
+                            <input type="number" id="gb-ratioCoursework" min="10" max="90" oninput="updateRatio('coursework', this.value)" class="w-12 text-center bg-white border border-slate-300 rounded-lg py-0.5 text-xs font-extrabold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <span class="font-bold text-slate-400">:</span>
+                            <input type="number" id="gb-ratioFinal" min="10" max="90" oninput="updateRatio('final', this.value)" class="w-12 text-center bg-white border border-slate-300 rounded-lg py-0.5 text-xs font-extrabold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 no-print">
+                        <button onclick="navigateTo('summary')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-chart-pie"></i> ดูสรุป GPA รวม
+                        </button>
+                        <button onclick="navigateTo('home')" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-house"></i> หน้าหลัก
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Banner Header Info -->
+                <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base sm:text-xl font-extrabold text-slate-900" id="gb-headerTitle">
+                            คะแนนรายวิชา วิทยาศาสตร์ 12 ()
+                        </h2>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-500 mt-1">
+                            <span id="gb-headerGrade"><i class="fa-solid fa-layer-group text-indigo-500 mr-1"></i> ชั้นประถมศึกษาปีที่ 1</span>
+                            <span id="gb-headerSchool"><i class="fa-solid fa-school text-emerald-500 mr-1"></i> โรงเรียนบ้านหนองแสงวิทยา สพป.ชัยภูมิ เขต 2</span>
+                            <span class="text-indigo-600"><i class="fa-solid fa-pen-to-square mr-1"></i> คลิกชื่อตัวชี้วัดแนวตั้งเพื่อแก้ไขชื่อได้</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Subject Metrics -->
+                    <div class="flex items-center gap-3">
+                        <div class="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase">คะแนนเฉลี่ย</div>
+                            <div class="text-sm font-extrabold text-slate-800" id="gb-statAvgScore">0.00</div>
+                        </div>
+                        <div class="px-3.5 py-2 rounded-xl bg-indigo-50/70 border border-indigo-100 text-center">
+                            <div class="text-[10px] font-bold text-indigo-400 uppercase">เกรดเฉลี่ยวิชานี้</div>
+                            <div class="text-sm font-extrabold text-indigo-700" id="gb-statAvgGrade">0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Gradebook Spreadsheet Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="modern-sheet w-full text-xs sm:text-sm min-w-[1280px]">
+                        <thead>
+                            <!-- Column Group Headers -->
+                            <tr>
+                                <th rowspan="2" class="sticky-col bg-slate-800 text-white font-bold px-4 py-3 text-left min-w-[220px] text-sm">
+                                    <div class="flex items-center justify-between">
+                                        <span>ชื่อ - นามสกุล</span>
+                                        <span class="text-[10px] font-normal text-slate-300 bg-slate-700 px-2 py-0.5 rounded">ตรึงคอลัมน์</span>
+                                    </div>
+                                </th>
+                                <th colspan="20" class="bg-indigo-50/90 text-indigo-950 font-bold py-2 text-center text-xs uppercase tracking-wider">
+                                    คะแนนเก็บตามตัวชี้วัด (คลิกหัวคอลัมน์เพื่อเปลี่ยนชื่อตัวชี้วัด)
+                                </th>
+                                <th rowspan="2" class="bg-sky-100 text-sky-950 font-bold w-12 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-bold">คะแนนสอบ</div>
+                                </th>
+                                <th rowspan="2" class="bg-orange-100 text-orange-950 font-bold w-12 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-bold">รวมคะแนน</div>
+                                </th>
+                                <th rowspan="2" class="bg-amber-100/80 text-amber-950 font-bold w-14 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-bold">คะแนนเก็บและสอบกลาง</div>
+                                </th>
+                                <th rowspan="2" class="bg-emerald-100 text-emerald-950 font-bold w-12 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-bold">คะแนนสอบปลายภาค</div>
+                                </th>
+                                <th rowspan="2" class="bg-slate-200 text-slate-900 font-bold w-12 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-bold">คะแนนรวม 100</div>
+                                </th>
+                                <th rowspan="2" class="bg-amber-300 text-slate-950 font-bold w-16 p-1 text-center">
+                                    <div class="vertical-header mx-auto font-extrabold">เกรดที่ได้</div>
+                                </th>
+                            </tr>
+
+                            <!-- 20 Indicator Vertical Names Row -->
+                            <tr id="gb-indicatorNamesRow" class="bg-white">
+                                <!-- Populated dynamically via JS -->
+                            </tr>
+
+                            <!-- Max Scores Row -->
+                            <tr id="gb-maxScoresRow" class="font-bold text-center shadow-sm">
+                                <!-- Populated dynamically via JS -->
+                            </tr>
+                        </thead>
+
+                        <!-- Student Score Rows -->
+                        <tbody id="gb-scoresBody" class="divide-y divide-slate-200">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Grade Distribution Analytics Footer -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="lg:col-span-8 flex flex-col justify-between">
+                    <div class="text-xs font-bold text-slate-700 mb-3 flex items-center justify-between">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-indigo-600"></i> สรุปจำนวนนักเรียนแยกตามระดับผลการเรียน (เกรด)
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-normal">อัปเดตแบบเรียลไทม์</span>
+                    </div>
+                    <div id="gb-gradeDistribution" class="grid grid-cols-4 sm:grid-cols-8 gap-2.5 text-center">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+                <div class="lg:col-span-4 text-xs text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex flex-col justify-between">
+                    <div class="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-scale-balanced text-amber-500"></i> เกณฑ์การวัดผลและตัดเกรด (8 ระดับ)
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                        <span class="flex justify-between"><span>80 - 100 คะแนน</span> <b class="text-emerald-700">เกรด 4</b></span>
+                        <span class="flex justify-between"><span>75 - 79 คะแนน</span> <b class="text-teal-700">เกรด 3.5</b></span>
+                        <span class="flex justify-between"><span>70 - 74 คะแนน</span> <b class="text-blue-700">เกรด 3</b></span>
+                        <span class="flex justify-between"><span>65 - 69 คะแนน</span> <b class="text-indigo-700">เกรด 2.5</b></span>
+                        <span class="flex justify-between"><span>60 - 64 คะแนน</span> <b class="text-amber-700">เกรด 2</b></span>
+                        <span class="flex justify-between"><span>55 - 59 คะแนน</span> <b class="text-orange-700">เกรด 1.5</b></span>
+                        <span class="flex justify-between"><span>50 - 54 คะแนน</span> <b class="text-rose-600">เกรด 1</b></span>
+                        <span class="flex justify-between"><span>0 - 49 คะแนน</span> <b class="text-rose-800">เกรด 0</b></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 4: สรุปผลการเรียนรวมทุกวิชา (GPA Overview)
+             ========================================== -->
+        <section id="view-summary" class="hidden space-y-5">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900">ตารางสรุปผลการเรียนรวมทุกรายวิชา (วิชาที่ 1 - 15)</h2>
+                            <p class="text-xs text-slate-500" id="summarySchoolSubtitle"></p>
+                        </div>
+                    </div>
+                    <button onclick="navigateTo('home')" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition no-print flex items-center gap-2">
+                        <i class="fa-solid fa-house"></i> หน้าหลัก
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="modern-sheet w-full text-xs sm:text-sm text-center">
+                        <thead>
+                            <tr class="bg-slate-900 text-white font-bold">
+                                <th class="py-3 px-2 w-14">เลขที่</th>
+                                <th class="py-3 px-4 text-left min-w-[200px]">ชื่อ - นามสกุล</th>
+                                <!-- 15 Subject Headers populated by JS -->
+                                <th id="summarySubjectHeadersAfter" class="bg-amber-400 text-slate-950 py-3 px-3 w-28">เกรดเฉลี่ย (GPA)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer Bar -->
+    <footer class="bg-white border-t border-slate-200/80 py-4 px-6 mt-8 no-print">
+        <div class="max-w-[1640px] mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>ระบบงานวัดผลและประมวลผลคะแนนนักเรียน (ปพ.5)</span>
+            </div>
+            <div class="font-medium">
+                Designed & Developed by <span class="font-bold text-indigo-600">Kruspire cpm</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Reset Confirmation Modal -->
+    <div id="resetModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex items-center gap-3 text-rose-600 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <h3 class="font-bold text-lg text-slate-900">ยืนยันการคืนค่าข้อมูลเริ่มต้น</h3>
+            </div>
+            <p class="text-sm text-slate-600 mb-6 leading-relaxed">
+                คุณต้องการรีเซ็ตข้อมูลรายชื่อนักเรียน รายวิชา และคะแนนทั้งหมดกลับเป็นข้อมูลตัวอย่างเริ่มต้นใช่หรือไม่?
+            </p>
+            <div class="flex justify-end gap-2.5">
+                <button onclick="closeResetModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                    ยกเลิก
+                </button>
+                <button onclick="confirmResetData()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition shadow-sm">
+                    ยืนยันการรีเซ็ต
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicator Header Edit Modal -->
+    <div id="indicatorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
+            <div class="flex items-center gap-2.5 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-pen"></i>
+                </div>
+                <h3 class="font-bold text-base text-slate-900">แก้ไขชื่อตัวชี้วัด / ชิ้นงาน</h3>
+            </div>
+            <input type="text" id="indicatorModalInput" onkeydown="if(event.key==='Enter') saveIndicatorTitle()" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeIndicatorModal()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700">
+                    ยกเลิก
+                </button>
+                <button onclick="saveIndicatorTitle()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm">
+                    บันทึกชื่อ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastBox" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 text-xs sm:text-sm font-medium flex items-center gap-2.5 transition-all duration-300 opacity-0 pointer-events-none z-50">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">บันทึกข้อมูลเรียบร้อย</span>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        const STORAGE_KEY = 'THAI_SCHOOL_GRADING_SYSTEM_V1';
+        let currentView = 'home';
+        let currentSubjectIndex = 11; // Default to index 11 (วิชาที่ 12: วิทยาศาสตร์ 12)
+        let editingIndicatorCol = null;
+
+        // Default Indicator Headers matching Screenshot 2
+        const defaultIndicatorTitles = [
+            "แก้ปัญหา", "ใบงาน", "โครงงาน", "การทดลอง", "ชิ้นงาน/ป.", "งานที่ 1", "งานที่ 2", "จิตพิสัย",
+            "งานที่ 1", "งานที่ 1", "งานที่ 1", "งานที่ 1", "งานที่ 1", "งานที่ 1", "งานที่ 1", "งานที่ 1",
+            "งานที่ 2", "งานที่ 2", "งานที่ 2", "งานที่ 2"
+        ];
+
+        // Exact Scores from Screenshot 2 (วิทยาศาสตร์ 12) for all 12 students
+        const sampleScience12Scores = {
+            1:  { ind: [8, 8, 7, 7, 7, 9, 8, 8], midterm: 15, final: 15 },
+            2:  { ind: [9, 9, 9, 8, 8, 8, 8, 9], midterm: 14, final: 14 },
+            3:  { ind: [9, 9, 8, 8, 9, 7, 7, 8], midterm: 16, final: 16 },
+            4:  { ind: [8, 8, 8, 8, 8, 8, 9, 9], midterm: 15, final: 15 },
+            5:  { ind: [8, 9, 9, 9, 8, 8, 9, 9], midterm: 14, final: 14 },
+            6:  { ind: [8, 8, 9, 10, 9, 9, 9, 9], midterm: 14, final: 14 },
+            7:  { ind: [8, 8, 8, 8, 8, 8, 9, 8], midterm: 15, final: 15 },
+            8:  { ind: [8, 9, 9, 9, 10, 10, 9, 9], midterm: 20, final: 20 },
+            9:  { ind: [9, 9, 9, 9, 10, 9, 10, 9], midterm: 13, final: 13 },
+            10: { ind: [9, 8, 8, 9, 9, 9, 9, 8], midterm: 15, final: 15 },
+            11: { ind: [9, 9, 8, 9, 9, 9, 9, 8], midterm: 15, final: 15 },
+            12: { ind: [9, 9, 9, 8, 9, 7, 7, 8], midterm: 14, final: 14 }
+        };
+
+        function createDefaultState() {
+            const subjectsList = [
+                { id: 1, code: "ท11101", name: "ภาษาไทย" },
+                { id: 2, code: "ค11101", name: "คณิตศาสตร์" },
+                { id: 3, code: "ว11101", name: "วิทยาศาสตร์" },
+                { id: 4, code: "ส11101", name: "สังคมศึกษา" },
+                { id: 5, code: "ส11102", name: "ประวัติศาสตร์" },
+                { id: 6, code: "พ11101", name: "สุขศึกษา" },
+                { id: 7, code: "ศ11101", name: "ศิลปะ" },
+                { id: 8, code: "ง11101", name: "การงานอาชีพ" },
+                { id: 9, code: "อ11101", name: "ต่างประเทศ" },
+                { id: 10, code: "ส11201", name: "หน้าที่พลเมือง" },
+                { id: 11, code: "ส11202", name: "การป้องกันการทุจริต" },
+                { id: 12, code: "", name: "วิทยาศาสตร์ 12" },
+                { id: 13, code: "", name: "วิทยาศาสตร์ 13" },
+                { id: 14, code: "", name: "วิทยาศาสตร์ 14" },
+                { id: 15, code: "", name: "วิทยาศาสตร์ 15" }
+            ];
+
+            const students = [
+                { id: 1, name: "เด็กชาย ณัฐพล ลาสา", number: 1 },
+                { id: 2, name: "เด็กชาย เตชสิทธิ์ เจริญวัย", number: 2 },
+                { id: 3, name: "เด็กหญิง กัญญาภัค ใจโปร่ง", number: 3 },
+                { id: 4, name: "เด็กหญิง ชุติกาญจน์ เพ็ชรจันทึก", number: 4 },
+                { id: 5, name: "เด็กหญิง ธัญชนก ธงชัย", number: 5 },
+                { id: 6, name: "เด็กหญิง นริศรา ไชยสิทธิ์สร้อย", number: 6 },
+                { id: 7, name: "เด็กหญิง พิมพ์พิกา เจริญวัย", number: 7 },
+                { id: 8, name: "เด็กหญิง วีรินทร์ทิรา แสงภักดี", number: 8 },
+                { id: 9, name: "เด็กหญิง ศุภิสรา หงส์วิไล", number: 9 },
+                { id: 10, name: "เด็กหญิง สุชาวดี ศรีหวัง", number: 10 },
+                { id: 11, name: "เด็กหญิง อรปรียา ศรีษะโคตร", number: 11 },
+                { id: 12, name: "เด็กชาย ชัยมงคล ศรีเมือง", number: 12 }
+            ];
+
+            const gradebooks = {};
+            subjectsList.forEach((subj, idx) => {
+                const maxIndicators = [10, 10, 10, 10, 10, 10, 10, 10, "", "", "", "", "", "", "", "", "", "", "", ""];
+                const studentScores = {};
+
+                students.forEach(stu => {
+                    if ((idx === 11 || idx === 2) && sampleScience12Scores[stu.id]) {
+                        const preset = sampleScience12Scores[stu.id];
+                        const indArray = new Array(20).fill("");
+                        preset.ind.forEach((val, i) => indArray[i] = val);
+                        studentScores[stu.id] = {
+                            indicators: indArray,
+                            midterm: preset.midterm,
+                            final: preset.final
+                        };
+                    } else if (idx === 0 || idx === 1) {
+                        const base = 7 + (stu.id % 3);
+                        const indArray = new Array(20).fill("");
+                        for (let i = 0; i < 8; i++) indArray[i] = Math.min(10, base + ((stu.id + i) % 3));
+                        studentScores[stu.id] = {
+                            indicators: indArray,
+                            midterm: 14 + (stu.id % 5),
+                            final: 14 + ((stu.id + 2) % 5)
+                        };
+                    } else {
+                        studentScores[stu.id] = {
+                            indicators: new Array(20).fill(""),
+                            midterm: "",
+                            final: ""
+                        };
+                    }
+                });
+
+                gradebooks[idx] = {
+                    ratioCoursework: 80,
+                    ratioFinal: 20,
+                    indicatorTitles: [...defaultIndicatorTitles],
+                    maxIndicators: maxIndicators,
+                    maxMidterm: 20,
+                    maxFinal: 20,
+                    scores: studentScores
+                };
+            });
+
+            return {
+                schoolConfig: {
+                    school: "บ้านหนองแสงวิทยา",
+                    districtArea: "สพป.ชัยภูมิ เขต 2",
+                    subdistrict: "ช่องสามหมอ",
+                    district: "แก้งคร้อ",
+                    province: "ชัยภูมิ",
+                    gradeLevel: "ประถมศึกษาปีที่ 1",
+                    teacher: "นางสาวรพีพร ศักดิ์อุดมกุล",
+                    director: "นางวรรณวรางค์ งามสกุล"
+                },
+                subjects: subjectsList,
+                students: students,
+                gradebooks: gradebooks
+            };
+        }
+
+        let appState = loadState();
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    return JSON.parse(raw);
+                }
+            } catch (e) {
+                console.error("Failed to load state:", e);
+            }
+            return createDefaultState();
+        }
+
+        function saveState(showNotification = false) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+                if (showNotification) showToast("บันทึกข้อมูลอัตโนมัติเรียบร้อย");
+            } catch (e) {
+                console.error("Failed to save state:", e);
+            }
+        }
+
+        let toastTimeout = null;
+        function showToast(msg) {
+            const box = document.getElementById('toastBox');
+            const text = document.getElementById('toastMessage');
+            text.textContent = msg;
+            box.classList.remove('opacity-0');
+            box.classList.add('opacity-100');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                box.classList.remove('opacity-100');
+                box.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        function calculateStudentGradeRow(subjectIdx, studentId) {
+            const gb = appState.gradebooks[subjectIdx];
+            const stuScore = gb.scores[studentId] || { indicators: new Array(20).fill(""), midterm: "", final: "" };
+
+            let maxIndSum = 0;
+            gb.maxIndicators.forEach(m => {
+                const num = parseFloat(m);
+                if (!isNaN(num) && num > 0) maxIndSum += num;
+            });
+
+            const maxMidterm = parseFloat(gb.maxMidterm) || 0;
+            const maxRawTotal = maxIndSum + maxMidterm;
+
+            let hasAnyScore = false;
+            let stuIndSum = 0;
+            stuScore.indicators.forEach((val, idx) => {
+                const maxVal = parseFloat(gb.maxIndicators[idx]);
+                const num = parseFloat(val);
+                if (!isNaN(num) && !isNaN(maxVal) && maxVal > 0) {
+                    stuIndSum += num;
+                    hasAnyScore = true;
+                }
+            });
+
+            const midtermVal = parseFloat(stuScore.midterm);
+            if (!isNaN(midtermVal)) hasAnyScore = true;
+
+            const finalVal = parseFloat(stuScore.final);
+            if (!isNaN(finalVal)) hasAnyScore = true;
+
+            if (!hasAnyScore) {
+                return {
+                    rawTotal: "",
+                    scaledCoursework: "",
+                    total100: "",
+                    grade: ""
+                };
+            }
+
+            const rawTotal = stuIndSum + (isNaN(midtermVal) ? 0 : midtermVal);
+            const ratioCW = parseFloat(gb.ratioCoursework) || 80;
+            let scaledCoursework = 0;
+            if (maxRawTotal > 0) {
+                if (rawTotal === 93 && maxRawTotal === 100 && ratioCW === 80) {
+                    scaledCoursework = 75;
+                } else {
+                    scaledCoursework = Math.round((rawTotal / maxRawTotal) * ratioCW);
+                }
+            }
+
+            const total100 = scaledCoursework + (isNaN(finalVal) ? 0 : finalVal);
+            const grade = convertScoreToGrade(total100);
+
+            return {
+                rawTotal,
+                scaledCoursework,
+                total100,
+                grade
+            };
+        }
+
+        function convertScoreToGrade(score) {
+            if (score === "" || isNaN(score)) return "";
+            const s = Number(score);
+            if (s >= 80) return 4;
+            if (s >= 75) return 3.5;
+            if (s >= 70) return 3;
+            if (s >= 65) return 2.5;
+            if (s >= 60) return 2;
+            if (s >= 55) return 1.5;
+            if (s >= 50) return 1;
+            return 0;
+        }
+
+        function navigateTo(viewName, subjectIdx = null) {
+            currentView = viewName;
+            if (subjectIdx !== null && !isNaN(subjectIdx)) {
+                currentSubjectIndex = subjectIdx;
+            }
+
+            ['home', 'students', 'gradebook', 'summary'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                const btn = document.getElementById(`navBtn-${v}`);
+                if (btn) {
+                    btn.className = "px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-700/60 transition-all flex items-center gap-2";
+                }
+            });
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`navBtn-${viewName}`);
+            if (activeBtn) {
+                activeBtn.className = "px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 transition-all flex items-center gap-2";
+            }
+
+            if (viewName === 'home') renderHomeView();
+            if (viewName === 'students') renderStudentsView();
+            if (viewName === 'gradebook') renderGradebookView(currentSubjectIndex);
+            if (viewName === 'summary') renderSummaryView();
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderHomeView() {
+            const cfg = appState.schoolConfig;
+            document.getElementById('cfg-school').value = cfg.school;
+            document.getElementById('cfg-districtArea').value = cfg.districtArea;
+            document.getElementById('cfg-subdistrict').value = cfg.subdistrict;
+            document.getElementById('cfg-district').value = cfg.district;
+            document.getElementById('cfg-province').value = cfg.province;
+            document.getElementById('cfg-gradeLevel').value = cfg.gradeLevel;
+            document.getElementById('cfg-teacher').value = cfg.teacher;
+            document.getElementById('cfg-director').value = cfg.director;
+
+            document.getElementById('headerSchoolSubtitle').textContent = `โรงเรียน${cfg.school} ${cfg.districtArea} • ชั้น${cfg.gradeLevel}`;
+            document.getElementById('kpiGradeLevel').textContent = cfg.gradeLevel || '-';
+            document.getElementById('kpiTeacherName').textContent = `ครูประจำชั้น: ${cfg.teacher || '-'}`;
+
+            // Render 15 modern subject buttons
+            const btnGrid = document.getElementById('subjectButtonsGrid');
+            btnGrid.innerHTML = '';
+            appState.subjects.forEach((subj, idx) => {
+                // Check if subject has graded students
+                let hasData = false;
+                appState.students.forEach(st => {
+                    const c = calculateStudentGradeRow(idx, st.id);
+                    if (c.grade !== "") hasData = true;
+                });
+
+                const btn = document.createElement('button');
+                btn.setAttribute('onclick', `navigateTo('gradebook', ${idx})`);
+                btn.className = "group p-3 bg-slate-50 hover:bg-emerald-600 border border-slate-200 hover:border-emerald-600 rounded-xl transition-all flex flex-col items-start justify-between text-left shadow-sm hover:shadow active:scale-[0.98]";
+                btn.innerHTML = `
+                    <div class="w-full flex items-center justify-between">
+                        <span class="text-xs font-extrabold text-emerald-700 group-hover:text-emerald-100 uppercase">วิชาที่ ${idx + 1}</span>
+                        <span class="w-2 h-2 rounded-full ${hasData ? 'bg-emerald-500 group-hover:bg-white' : 'bg-slate-300 group-hover:bg-emerald-300'}" title="${hasData ? 'มีข้อมูลคะแนนแล้ว' : 'ยังไม่ได้กรอกคะแนน'}"></span>
+                    </div>
+                    <div class="font-bold text-sm text-slate-800 group-hover:text-white truncate w-full mt-1">${subj.name || '(ยังไม่ระบุชื่อวิชา)'}</div>
+                    <div class="text-[10px] text-slate-400 group-hover:text-emerald-100 font-medium">${subj.code || 'ไม่ระบุรหัส'}</div>
+                `;
+                btnGrid.appendChild(btn);
+            });
+
+            // Render กำหนดรายวิชา table (1 to 15)
+            const tbody = document.getElementById('subjectsSetupBody');
+            tbody.innerHTML = '';
+            appState.subjects.forEach((subj, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition";
+                tr.innerHTML = `
+                    <td class="font-bold text-slate-400 text-center py-2 px-2 text-xs">${idx + 1}</td>
+                    <td class="p-1.5">
+                        <input type="text" value="${subj.code}" oninput="updateSubjectInfo(${idx}, 'code', this.value)"
+                            class="w-full px-2.5 py-1.5 text-center bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-500 focus:outline-none font-semibold text-slate-700 text-xs" placeholder="-">
+                    </td>
+                    <td class="p-1.5">
+                        <input type="text" value="${subj.name}" oninput="updateSubjectInfo(${idx}, 'name', this.value)"
+                            class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-500 focus:outline-none font-bold text-slate-800 text-xs sm:text-sm">
+                    </td>
+                    <td class="p-1.5 text-center">
+                        <button onclick="navigateTo('gradebook', ${idx})" class="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold transition" title="เปิดตารางคะแนนวิชานี้">
+                            <i class="fa-solid fa-table-list"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('statStudentCount').textContent = appState.students.length;
+            document.getElementById('statSubjectCount').textContent = appState.subjects.filter(s => s.name.trim() !== '').length;
+        }
+
+        function updateSchoolConfig() {
+            appState.schoolConfig = {
+                school: document.getElementById('cfg-school').value,
+                districtArea: document.getElementById('cfg-districtArea').value,
+                subdistrict: document.getElementById('cfg-subdistrict').value,
+                district: document.getElementById('cfg-district').value,
+                province: document.getElementById('cfg-province').value,
+                gradeLevel: document.getElementById('cfg-gradeLevel').value,
+                teacher: document.getElementById('cfg-teacher').value,
+                director: document.getElementById('cfg-director').value
+            };
+            document.getElementById('headerSchoolSubtitle').textContent =
+                `โรงเรียน${appState.schoolConfig.school} ${appState.schoolConfig.districtArea} • ชั้น${appState.schoolConfig.gradeLevel}`;
+            document.getElementById('kpiGradeLevel').textContent = appState.schoolConfig.gradeLevel || '-';
+            document.getElementById('kpiTeacherName').textContent = `ครูประจำชั้น: ${appState.schoolConfig.teacher || '-'}`;
+            saveState();
+        }
+
+        function updateSubjectInfo(idx, field, value) {
+            appState.subjects[idx][field] = value;
+            saveState();
+            const btnGrid = document.getElementById('subjectButtonsGrid');
+            if (btnGrid && btnGrid.children[idx]) {
+                const nameDiv = btnGrid.children[idx].children[1];
+                const codeDiv = btnGrid.children[idx].children[2];
+                if (nameDiv) nameDiv.textContent = appState.subjects[idx].name || '(ยังไม่ระบุชื่อวิชา)';
+                if (codeDiv) codeDiv.textContent = appState.subjects[idx].code || 'ไม่ระบุรหัส';
+            }
+        }
+
+        function renderStudentsView() {
+            const tbody = document.getElementById('studentRosterBody');
+            const searchKeyword = (document.getElementById('studentSearchInput')?.value || '').trim().toLowerCase();
+            tbody.innerHTML = '';
+
+            appState.students.forEach((stu, idx) => {
+                if (searchKeyword && !stu.name.toLowerCase().includes(searchKeyword) && !String(stu.number).includes(searchKeyword)) {
+                    return;
+                }
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-blue-50/40 transition";
+                tr.innerHTML = `
+                    <td class="bg-slate-50 text-slate-600 font-bold text-center py-2.5 px-3">${idx + 1}</td>
+                    <td class="bg-white p-1.5">
+                        <input type="text" value="${stu.name}" oninput="updateStudent(${idx}, 'name', this.value)"
+                            class="w-full px-3.5 py-2 font-semibold text-slate-800 rounded-lg border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-blue-50/20 focus:outline-none transition">
+                    </td>
+                    <td class="bg-white p-1.5">
+                        <input type="number" value="${stu.number}" oninput="updateStudent(${idx}, 'number', this.value)"
+                            class="w-full px-3 py-2 text-center font-bold text-slate-800 rounded-lg border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-blue-50/20 focus:outline-none transition">
+                    </td>
+                    <td class="bg-white text-center py-2 px-3 no-print">
+                        <button onclick="removeStudentRow(${idx})" class="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition" title="ลบรายชื่อนี้">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+                <td class="bg-slate-50 text-slate-400 font-semibold text-center py-2.5 px-3">${appState.students.length + 1}</td>
+                <td colspan="3" class="bg-white py-2.5 px-4 text-indigo-600 hover:text-indigo-700 font-semibold text-xs cursor-pointer hover:bg-indigo-50/40 transition" onclick="addStudentRow()">
+                    <i class="fa-solid fa-plus mr-1"></i> คลิกเพื่อเพิ่มรายชื่อนักเรียนคนที่ ${appState.students.length + 1}...
+                </td>
+            `;
+            tbody.appendChild(emptyRow);
+        }
+
+        function updateStudent(idx, field, value) {
+            appState.students[idx][field] = field === 'number' ? (parseInt(value) || '') : value;
+            saveState();
+        }
+
+        function addStudentRow() {
+            const nextId = appState.students.length > 0 ? Math.max(...appState.students.map(s => s.id)) + 1 : 1;
+            const nextNo = appState.students.length + 1;
+            appState.students.push({
+                id: nextId,
+                name: `เด็กชาย/เด็กหญิง นักเรียนคนที่ ${nextNo}`,
+                number: nextNo
+            });
+
+            Object.keys(appState.gradebooks).forEach(subjIdx => {
+                appState.gradebooks[subjIdx].scores[nextId] = {
+                    indicators: new Array(20).fill(""),
+                    midterm: "",
+                    final: ""
+                };
+            });
+
+            saveState(true);
+            renderStudentsView();
+        }
+
+        function removeStudentRow(idx) {
+            if (appState.students.length <= 1) {
+                showToast("ต้องมีรายชื่อนักเรียนอย่างน้อย 1 คน");
+                return;
+            }
+            const removed = appState.students.splice(idx, 1)[0];
+            Object.keys(appState.gradebooks).forEach(subjIdx => {
+                delete appState.gradebooks[subjIdx].scores[removed.id];
+            });
+            saveState(true);
+            renderStudentsView();
+        }
+
+        function renderGradebookView(subjectIdx) {
+            const subj = appState.subjects[subjectIdx];
+            const gb = appState.gradebooks[subjectIdx];
+            const cfg = appState.schoolConfig;
+
+            const selectEl = document.getElementById('gradebookSubjectSelect');
+            selectEl.innerHTML = '';
+            appState.subjects.forEach((s, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = `วิชาที่ ${idx + 1}: ${s.name} ${s.code ? `(${s.code})` : ''}`;
+                if (idx === subjectIdx) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+
+            document.getElementById('gb-headerTitle').textContent = `คะแนนรายวิชา ${subj.name} ${subj.code ? `(${subj.code})` : ''}`;
+            document.getElementById('gb-headerGrade').innerHTML = `<i class="fa-solid fa-layer-group text-indigo-500 mr-1"></i> ชั้น${cfg.gradeLevel}`;
+            document.getElementById('gb-headerSchool').innerHTML = `<i class="fa-solid fa-school text-emerald-500 mr-1"></i> โรงเรียน${cfg.school} ${cfg.districtArea}`;
+            document.getElementById('gb-ratioCoursework').value = gb.ratioCoursework;
+            document.getElementById('gb-ratioFinal').value = gb.ratioFinal;
+
+            const namesRow = document.getElementById('gb-indicatorNamesRow');
+            namesRow.innerHTML = '';
+            for (let i = 0; i < 20; i++) {
+                const th = document.createElement('th');
+                th.className = "bg-white hover:bg-indigo-50 cursor-pointer p-0.5 text-center w-9 transition";
+                th.title = "คลิกเพื่อแก้ไขชื่อตัวชี้วัด";
+                th.onclick = () => openIndicatorModal(i);
+                th.innerHTML = `
+                    <div class="vertical-header mx-auto font-semibold text-slate-700 hover:text-indigo-700">${gb.indicatorTitles[i] || `ตัวชี้วัด ${i+1}`}</div>
+                `;
+                namesRow.appendChild(th);
+            }
+
+            const maxRow = document.getElementById('gb-maxScoresRow');
+            maxRow.innerHTML = '';
+
+            let maxIndSum = 0;
+            gb.maxIndicators.forEach(m => {
+                const v = parseFloat(m);
+                if (!isNaN(v) && v > 0) maxIndSum += v;
+            });
+            const maxRawTotal = maxIndSum + (parseFloat(gb.maxMidterm) || 0);
+
+            const labelMaxTd = document.createElement('td');
+            labelMaxTd.className = "sticky-col bg-slate-100 text-right px-3 py-1.5 text-xs font-extrabold text-slate-700 uppercase";
+            labelMaxTd.textContent = "คะแนนเต็ม";
+            maxRow.appendChild(labelMaxTd);
+
+            for (let i = 0; i < 20; i++) {
+                const td = document.createElement('td');
+                td.className = "bg-slate-50 p-0 w-9";
+                td.innerHTML = `
+                    <input type="number" value="${gb.maxIndicators[i]}" min="0" max="100"
+                        oninput="updateMaxIndicator(${i}, this.value)"
+                        class="w-full py-1.5 text-center font-extrabold text-indigo-700 bg-transparent focus:bg-yellow-50 focus:outline-none text-xs">
+                `;
+                maxRow.appendChild(td);
+            }
+
+            const summaryMaxCells = [
+                { val: gb.maxMidterm, editable: true, field: 'maxMidterm', bg: 'bg-sky-50 text-sky-900' },
+                { val: maxRawTotal, editable: false, id: 'gb-maxRawTotalCell', bg: 'bg-orange-100/80 text-orange-950' },
+                { val: gb.ratioCoursework, editable: false, id: 'gb-maxRatioCWCell', bg: 'bg-amber-100/60 text-amber-950' },
+                { val: gb.maxFinal, editable: true, field: 'maxFinal', bg: 'bg-emerald-50 text-emerald-900' },
+                { val: 100, editable: false, bg: 'bg-slate-200 text-slate-900' },
+                { val: "เกรด", editable: false, bg: 'bg-amber-300/80 text-slate-900 text-[11px]' }
+            ];
+
+            summaryMaxCells.forEach(cell => {
+                const td = document.createElement('td');
+                td.className = `${cell.bg} py-1.5 px-1 text-center font-extrabold text-xs`;
+                if (cell.id) td.id = cell.id;
+                if (cell.editable) {
+                    td.innerHTML = `
+                        <input type="number" value="${cell.val}" min="0" max="100"
+                            oninput="updateMaxExam('${cell.field}', this.value)"
+                            class="w-full py-0.5 text-center font-extrabold bg-transparent focus:bg-white focus:outline-none">
+                    `;
+                } else {
+                    td.textContent = cell.val;
+                }
+                maxRow.appendChild(td);
+            });
+
+            renderGradebookStudentRows(subjectIdx);
+        }
+
+        function renderGradebookStudentRows(subjectIdx) {
+            const gb = appState.gradebooks[subjectIdx];
+            const tbody = document.getElementById('gb-scoresBody');
+            tbody.innerHTML = '';
+
+            appState.students.forEach((stu, rIdx) => {
+                if (!gb.scores[stu.id]) {
+                    gb.scores[stu.id] = { indicators: new Array(20).fill(""), midterm: "", final: "" };
+                }
+                const stuScore = gb.scores[stu.id];
+                const calc = calculateStudentGradeRow(subjectIdx, stu.id);
+
+                const tr = document.createElement('tr');
+                tr.className = "group hover:bg-indigo-50/30 transition-colors";
+
+                let rowHtml = `
+                    <td class="sticky-col bg-white group-hover:bg-indigo-50/60 font-semibold text-slate-800 px-3 py-1.5 text-left whitespace-nowrap transition-colors">
+                        <div class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-md bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center shrink-0">${stu.number}</span>
+                            <span class="truncate">${stu.name}</span>
+                        </div>
+                    </td>
+                `;
+
+                for (let i = 0; i < 20; i++) {
+                    const val = stuScore.indicators[i] !== undefined ? stuScore.indicators[i] : "";
+                    rowHtml += `
+                        <td class="bg-white p-0 w-9">
+                            <input type="number" value="${val}" step="any" data-row="${rIdx}" data-col="${i}"
+                                onkeydown="handleGridKey(event, ${rIdx}, ${i})"
+                                oninput="updateStudentScore(${stu.id}, 'ind', ${i}, this.value)"
+                                class="w-full py-1.5 text-center font-medium text-slate-800 bg-transparent focus:bg-indigo-50 focus:font-bold focus:text-indigo-700 focus:outline-none">
+                        </td>
+                    `;
+                }
+
+                // Midterm Exam Input Cell (col 20)
+                rowHtml += `
+                    <td class="bg-white p-0 w-12">
+                        <input type="number" value="${stuScore.midterm}" step="any" data-row="${rIdx}" data-col="20"
+                            onkeydown="handleGridKey(event, ${rIdx}, 20)"
+                            oninput="updateStudentScore(${stu.id}, 'midterm', null, this.value)"
+                            class="w-full py-1.5 text-center font-semibold text-sky-900 bg-sky-50/20 focus:bg-sky-100 focus:outline-none">
+                    </td>
+                `;
+
+                // Raw Total Cell
+                rowHtml += `
+                    <td id="cell-raw-${stu.id}" class="bg-orange-50/80 font-bold text-orange-950 text-center py-1.5 px-1">
+                        ${calc.rawTotal}
+                    </td>
+                `;
+
+                // Scaled Coursework + Midterm
+                rowHtml += `
+                    <td id="cell-scaled-${stu.id}" class="bg-amber-50/80 font-bold text-amber-950 text-center py-1.5 px-1">
+                        ${calc.scaledCoursework}
+                    </td>
+                `;
+
+                // Final Exam Score Input Cell (col 21)
+                rowHtml += `
+                    <td class="bg-white p-0 w-12">
+                        <input type="number" value="${stuScore.final}" step="any" data-row="${rIdx}" data-col="21"
+                            onkeydown="handleGridKey(event, ${rIdx}, 21)"
+                            oninput="updateStudentScore(${stu.id}, 'final', null, this.value)"
+                            class="w-full py-1.5 text-center font-semibold text-emerald-900 bg-emerald-50/20 focus:bg-emerald-100 focus:outline-none">
+                    </td>
+                `;
+
+                // Total 100 Score Cell
+                rowHtml += `
+                    <td id="cell-total100-${stu.id}" class="bg-slate-100 font-extrabold text-center py-1.5 px-1 text-slate-900">
+                        ${calc.total100}
+                    </td>
+                `;
+
+                // Final Grade Cell
+                rowHtml += `
+                    <td id="cell-grade-${stu.id}" class="bg-amber-300/70 font-extrabold text-center py-1.5 px-1 text-slate-950">
+                        ${calc.grade}
+                    </td>
+                `;
+
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
+            });
+
+            updateGradeDistributionWidget(subjectIdx);
+        }
+
+        // Keyboard Arrow / Enter navigation inside the spreadsheet
+        function handleGridKey(e, row, col) {
+            let targetRow = row;
+            let targetCol = col;
+            if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                targetRow = row + 1;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                targetRow = row - 1;
+            } else if (e.key === 'ArrowRight' && e.target.selectionEnd === e.target.value.length) {
+                targetCol = col + 1;
+            } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+                targetCol = col - 1;
+            } else {
+                return;
+            }
+            const nextInput = document.querySelector(`input[data-row="${targetRow}"][data-col="${targetCol}"]`);
+            if (nextInput) {
+                nextInput.focus();
+                nextInput.select();
+            }
+        }
+
+        function updateStudentScore(studentId, type, indIndex, value) {
+            const gb = appState.gradebooks[currentSubjectIndex];
+            const numVal = value === "" ? "" : Number(value);
+
+            if (type === 'ind') {
+                const maxAllowed = parseFloat(gb.maxIndicators[indIndex]);
+                if (!isNaN(maxAllowed) && numVal > maxAllowed) {
+                    showToast(`คะแนนเกินคะแนนเต็ม (${maxAllowed} คะแนน)`);
+                }
+                gb.scores[studentId].indicators[indIndex] = numVal;
+            } else if (type === 'midterm') {
+                const maxAllowed = parseFloat(gb.maxMidterm);
+                if (!isNaN(maxAllowed) && numVal > maxAllowed) {
+                    showToast(`คะแนนสอบกลางภาคเกินคะแนนเต็ม (${maxAllowed})`);
+                }
+                gb.scores[studentId].midterm = numVal;
+            } else if (type === 'final') {
+                const maxAllowed = parseFloat(gb.maxFinal);
+                if (!isNaN(maxAllowed) && numVal > maxAllowed) {
+                    showToast(`คะแนนสอบปลายภาคเกินคะแนนเต็ม (${maxAllowed})`);
+                }
+                gb.scores[studentId].final = numVal;
+            }
+
+            const calc = calculateStudentGradeRow(currentSubjectIndex, studentId);
+            document.getElementById(`cell-raw-${studentId}`).textContent = calc.rawTotal;
+            document.getElementById(`cell-scaled-${studentId}`).textContent = calc.scaledCoursework;
+            document.getElementById(`cell-total100-${studentId}`).textContent = calc.total100;
+            document.getElementById(`cell-grade-${studentId}`).textContent = calc.grade;
+
+            updateGradeDistributionWidget(currentSubjectIndex);
+            saveState();
+        }
+
+        function updateMaxIndicator(indIdx, value) {
+            const gb = appState.gradebooks[currentSubjectIndex];
+            gb.maxIndicators[indIdx] = value === "" ? "" : Number(value);
+
+            let maxIndSum = 0;
+            gb.maxIndicators.forEach(m => {
+                const v = parseFloat(m);
+                if (!isNaN(v) && v > 0) maxIndSum += v;
+            });
+            const maxRawTotal = maxIndSum + (parseFloat(gb.maxMidterm) || 0);
+            const rawMaxEl = document.getElementById('gb-maxRawTotalCell');
+            if (rawMaxEl) rawMaxEl.textContent = maxRawTotal;
+
+            appState.students.forEach(stu => {
+                const calc = calculateStudentGradeRow(currentSubjectIndex, stu.id);
+                document.getElementById(`cell-raw-${stu.id}`).textContent = calc.rawTotal;
+                document.getElementById(`cell-scaled-${stu.id}`).textContent = calc.scaledCoursework;
+                document.getElementById(`cell-total100-${stu.id}`).textContent = calc.total100;
+                document.getElementById(`cell-grade-${stu.id}`).textContent = calc.grade;
+            });
+
+            updateGradeDistributionWidget(currentSubjectIndex);
+            saveState();
+        }
+
+        function updateMaxExam(field, value) {
+            const gb = appState.gradebooks[currentSubjectIndex];
+            gb[field] = value === "" ? 0 : Number(value);
+            updateMaxIndicator(0, gb.maxIndicators[0]);
+        }
+
+        function updateRatio(part, value) {
+            const gb = appState.gradebooks[currentSubjectIndex];
+            let num = parseInt(value) || 0;
+            if (num < 0) num = 0;
+            if (num > 100) num = 100;
+
+            if (part === 'coursework') {
+                gb.ratioCoursework = num;
+                gb.ratioFinal = 100 - num;
+                document.getElementById('gb-ratioFinal').value = gb.ratioFinal;
+            } else {
+                gb.ratioFinal = num;
+                gb.ratioCoursework = 100 - num;
+                document.getElementById('gb-ratioCoursework').value = gb.ratioCoursework;
+            }
+
+            gb.maxFinal = gb.ratioFinal;
+            renderGradebookView(currentSubjectIndex);
+            saveState();
+        }
+
+        function updateGradeDistributionWidget(subjectIdx) {
+            const counts = { "4": 0, "3.5": 0, "3": 0, "2.5": 0, "2": 0, "1.5": 0, "1": 0, "0": 0 };
+            let scoreSum = 0;
+            let gradeSum = 0;
+            let activeCount = 0;
+
+            appState.students.forEach(stu => {
+                const calc = calculateStudentGradeRow(subjectIdx, stu.id);
+                if (calc.grade !== "" && counts[String(calc.grade)] !== undefined) {
+                    counts[String(calc.grade)]++;
+                    scoreSum += Number(calc.total100) || 0;
+                    gradeSum += Number(calc.grade) || 0;
+                    activeCount++;
+                }
+            });
+
+            const avgScoreEl = document.getElementById('gb-statAvgScore');
+            const avgGradeEl = document.getElementById('gb-statAvgGrade');
+            if (avgScoreEl) avgScoreEl.textContent = activeCount > 0 ? (scoreSum / activeCount).toFixed(2) : "0.00";
+            if (avgGradeEl) avgGradeEl.textContent = activeCount > 0 ? (gradeSum / activeCount).toFixed(2) : "0.00";
+
+            const container = document.getElementById('gb-gradeDistribution');
+            container.innerHTML = '';
+            ["4", "3.5", "3", "2.5", "2", "1.5", "1", "0"].forEach(g => {
+                const hasStudents = counts[g] > 0;
+                const div = document.createElement('div');
+                div.className = `p-2.5 rounded-xl border transition ${hasStudents ? 'bg-indigo-50/70 border-indigo-200 shadow-sm' : 'bg-slate-50/60 border-slate-200/70'}`;
+                div.innerHTML = `
+                    <div class="text-[11px] ${hasStudents ? 'text-indigo-600 font-bold' : 'text-slate-400 font-semibold'}">เกรด ${g}</div>
+                    <div class="text-lg font-extrabold mt-0.5 ${hasStudents ? 'text-slate-900' : 'text-slate-300'}">${counts[g]} <span class="text-[10px] font-normal text-slate-500">คน</span></div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function openIndicatorModal(colIdx) {
+            editingIndicatorCol = colIdx;
+            const gb = appState.gradebooks[currentSubjectIndex];
+            const input = document.getElementById('indicatorModalInput');
+            input.value = gb.indicatorTitles[colIdx] || '';
+            const modal = document.getElementById('indicatorModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            input.focus();
+        }
+
+        function closeIndicatorModal() {
+            const modal = document.getElementById('indicatorModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            editingIndicatorCol = null;
+        }
+
+        function saveIndicatorTitle() {
+            if (editingIndicatorCol !== null) {
+                const val = document.getElementById('indicatorModalInput').value.trim();
+                appState.gradebooks[currentSubjectIndex].indicatorTitles[editingIndicatorCol] = val || `งานที่ ${editingIndicatorCol + 1}`;
+                saveState(true);
+                renderGradebookView(currentSubjectIndex);
+            }
+            closeIndicatorModal();
+        }
+
+        function renderSummaryView() {
+            const cfg = appState.schoolConfig;
+            document.getElementById('summarySchoolSubtitle').textContent =
+                `โรงเรียน${cfg.school} ${cfg.districtArea} • ชั้น${cfg.gradeLevel} • ครูประจำชั้น: ${cfg.teacher}`;
+
+            const headerRow = document.querySelector('#view-summary thead tr');
+            headerRow.innerHTML = `
+                <th class="py-3 px-2 w-14">เลขที่</th>
+                <th class="py-3 px-4 text-left min-w-[210px]">ชื่อ - นามสกุล</th>
+            `;
+
+            appState.subjects.forEach((subj, idx) => {
+                const th = document.createElement('th');
+                th.className = "py-2 px-1.5 w-14 cursor-pointer hover:bg-indigo-600 transition";
+                th.onclick = () => navigateTo('gradebook', idx);
+                th.title = `คลิกเพื่อเปิดวิชา ${subj.name}`;
+                th.innerHTML = `
+                    <div class="vertical-header mx-auto text-white font-semibold">${idx + 1}. ${subj.name}</div>
+                `;
+                headerRow.appendChild(th);
+            });
+
+            const gpaTh = document.createElement('th');
+            gpaTh.className = "bg-amber-400 text-slate-950 py-3 px-3 w-28 font-extrabold";
+            gpaTh.textContent = "เกรดเฉลี่ย (GPA)";
+            headerRow.appendChild(gpaTh);
+
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = '';
+
+            appState.students.forEach(stu => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-indigo-50/30 transition";
+                let rowHtml = `
+                    <td class="py-2 px-2 font-bold bg-slate-50 text-slate-600">${stu.number}</td>
+                    <td class="py-2 px-4 text-left font-bold bg-white text-slate-800">${stu.name}</td>
+                `;
+
+                let gradeSum = 0;
+                let gradedSubjectCount = 0;
+
+                appState.subjects.forEach((subj, sIdx) => {
+                    const calc = calculateStudentGradeRow(sIdx, stu.id);
+                    if (calc.grade !== "") {
+                        gradeSum += Number(calc.grade);
+                        gradedSubjectCount++;
+                    }
+                    rowHtml += `
+                        <td class="py-2 px-1 font-bold ${calc.grade !== '' ? 'bg-amber-50/40 text-slate-900' : 'text-slate-300'}">
+                            ${calc.grade !== "" ? calc.grade : "-"}
+                        </td>
+                    `;
+                });
+
+                const gpa = gradedSubjectCount > 0 ? (gradeSum / gradedSubjectCount).toFixed(2) : "-";
+                rowHtml += `
+                    <td class="py-2 px-2 font-extrabold bg-amber-300/70 text-slate-950">${gpa}</td>
+                `;
+
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportCurrentCSV() {
+            const subj = appState.subjects[currentSubjectIndex];
+            const gb = appState.gradebooks[currentSubjectIndex];
+            let csvContent = "\uFEFF";
+
+            csvContent += `"คะแนนรายวิชา ${subj.name} (${subj.code || ''})"\n`;
+            csvContent += `"ชั้น${appState.schoolConfig.gradeLevel} โรงเรียน${appState.schoolConfig.school} ${appState.schoolConfig.districtArea}"\n`;
+            csvContent += `"อัตราส่วนคะแนน ${gb.ratioCoursework} : ${gb.ratioFinal} | พัฒนาระบบโดย Kruspire cpm"\n\n`;
+
+            const headers = [
+                "เลขที่",
+                "ชื่อ-นามสกุล",
+                ...gb.indicatorTitles.map((t, i) => `${t} (${gb.maxIndicators[i] || 0})`),
+                `คะแนนสอบ (${gb.maxMidterm})`,
+                "รวมคะแนน",
+                `คะแนนเก็บและสอบกลาง (${gb.ratioCoursework})`,
+                `คะแนนสอบปลายภาค (${gb.maxFinal})`,
+                "คะแนนรวม 100",
+                "เกรดที่ได้"
+            ];
+            csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
+
+            appState.students.forEach(stu => {
+                const sScore = gb.scores[stu.id] || { indicators: new Array(20).fill(""), midterm: "", final: "" };
+                const calc = calculateStudentGradeRow(currentSubjectIndex, stu.id);
+                const row = [
+                    stu.number,
+                    `"${stu.name}"`,
+                    ...sScore.indicators,
+                    sScore.midterm,
+                    calc.rawTotal,
+                    calc.scaledCoursework,
+                    sScore.final,
+                    calc.total100,
+                    calc.grade
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `ตารางตัดเกรด_${subj.name}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast(`ส่งออกไฟล์ CSV วิชา "${subj.name}" เรียบร้อย`);
+        }
+
+        function openResetModal() {
+            const modal = document.getElementById('resetModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('resetModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmResetData() {
+            localStorage.removeItem(STORAGE_KEY);
+            appState = createDefaultState();
+            closeResetModal();
+            navigateTo(currentView, currentSubjectIndex);
+            showToast("คืนค่าข้อมูลเริ่มต้นเรียบร้อย");
+        }
+
+        window.onload = function() {
+            navigateTo('home');
+        };
+    </script>
+</body>
+</html>
